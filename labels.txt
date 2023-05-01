@@ -1,0 +1,3 @@
+0 Corgis
+1 Husky
+2 Golden
