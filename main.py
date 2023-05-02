@@ -1,44 +1,61 @@
-from keras.models import load_model  # TensorFlow is required for Keras to work
-from PIL import Image, ImageOps  # Install pillow instead of PIL
+from flask import Flask, request, jsonify
+from keras.models import load_model
+from PIL import Image, ImageOps
 import numpy as np
+import os
 
-# Disable scientific notation for clarity
-np.set_printoptions(suppress=True)
-
-# Load the model
+# Load the model and labels
 model = load_model("keras_Model.h5", compile=False)
-
-# Load the labels
 class_names = open("labels.txt", "r").readlines()
 
-# Create the array of the right shape to feed into the keras model
-# The 'length' or number of images you can put into the array is
-# determined by the first position in the shape tuple, in this case 1
-data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
+# Initialize the Flask application
+app = Flask(__name__)
 
-# Replace this with the path to your image
-image = Image.open("/Users/fsfaysalcse/PycharmProjects/UniProj/img1.jpeg").convert("RGB")
 
-# resizing the image to be at least 224x224 and then cropping from the center
-size = (224, 224)
-image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
+# Define the predict function
+def predict(image):
+    # Create an array of the right shape to feed into the keras model
+    data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
 
-# turn the image into a numpy array
-image_array = np.asarray(image)
+    # Resize and normalize the image
+    size = (224, 224)
+    image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
+    image_array = np.asarray(image)
+    normalized_image_array = (image_array.astype(np.float32) / 127.5) - 1
+    data[0] = normalized_image_array
 
-# Normalize the image
-normalized_image_array = (image_array.astype(np.float32) / 127.5) - 1
+    # Predict the class and confidence score
+    prediction = model.predict(data)
+    index = np.argmax(prediction)
+    class_name = class_names[index][2:]
+    confidence_score = float(prediction[0][index])
 
-# Load the image into the array
-data[0] = normalized_image_array
+    return class_name, confidence_score
 
-# Predicts the model
-prediction = model.predict(data)
-index = np.argmax(prediction)
-class_name = class_names[index]
-confidence_score = prediction[0][index]
 
-# Print prediction and confidence score
-print("Class:", class_name[2:], end="")
-print("Confidence Score:", confidence_score)
+# Define the route for the API
+@app.route('/predict', methods=['POST'])
+def predict_api():
+    # Check if an image was uploaded
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image file uploaded'})
 
+    # Read the image file
+    image_file = request.files['image']
+    image = Image.open(image_file).convert('RGB')
+
+    # Make the prediction
+    class_name, confidence_score = predict(image)
+
+    # Return the prediction result
+    return jsonify({'class': class_name, 'confidence': confidence_score})
+
+
+@app.route('/')
+def index():
+    return "Hello World"
+
+
+# Run the Flask application
+if __name__ == '__main__':
+    app.run(debug=True, host="0.0.0.0",port=int(os.environ.get('PORT', 8080)))
