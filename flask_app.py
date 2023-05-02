@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from keras.models import load_model
 from PIL import Image, ImageOps
 import numpy as np
+import os
 
 # Load the model and labels
 model = load_model("keras_Model.h5", compile=False)
@@ -50,6 +51,11 @@ def predict_api():
     return jsonify({'class': class_name, 'confidence': confidence_score})
 
 
+@app.route('/')
+def index():
+    return "Hello World"
+
+
 # Run the Flask application
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0",port=int(os.environ.get('PORT', 8080)))
